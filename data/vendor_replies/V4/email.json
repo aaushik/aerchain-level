@@ -1,0 +1,12 @@
+{
+  "vendor_id": "V4",
+  "from_name": "Mahalaxmi Corrugators",
+  "from": "mahalaxmi.corr@mailbox.example",
+  "to": "meera.iyer@saffronbasket.example",
+  "subject": "rate",
+  "date": "2026-11-09T18:47:00+05:30",
+  "body": "Madam rate card photo attached pls check. Sent from my phone",
+  "attachments": [
+    "IMG_20261109_184512.jpg"
+  ]
+}

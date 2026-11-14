@@ -1,0 +1,13 @@
+{
+  "vendor_id": "V3",
+  "from_name": "Greenpack Solutions LLP",
+  "from": "rohit@greenpacksolutions.example",
+  "to": "meera.iyer@saffronbasket.example",
+  "subject": "Greenpack proposal — RFQ-2026-118",
+  "date": "2026-11-08T09:20:00+05:30",
+  "body": "Dear Ms. Iyer,\n\nPlease see our proposal letter attached, along with our ISO certificate.\n\nWarm regards,\nRohit Kulkarni",
+  "attachments": [
+    "Greenpack Proposal - Saffron Basket.docx",
+    "Greenpack ISO 9001.pdf"
+  ]
+}

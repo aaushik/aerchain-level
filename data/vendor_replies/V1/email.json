@@ -1,0 +1,13 @@
+{
+  "vendor_id": "V1",
+  "from_name": "Shree Balaji Packaging Industries",
+  "from": "sales@shreebalajipack.example",
+  "to": "meera.iyer@saffronbasket.example",
+  "subject": "RE: RFQ-2026-118 Corrugated packaging FY27-28 — our offer",
+  "date": "2026-11-06T17:42:00+05:30",
+  "body": "Dear Madam,\n\nPlease find attached our best offer against your above enquiry along with our lab test report.\nWe have quoted for all items. Kindly note rates are as per our standard format.\n\nRegards,\nJignesh Shah\nShree Balaji Packaging Industries\n+91 98200 00000",
+  "attachments": [
+    "SBP Offer Saffron Basket 06-11-26.xlsx",
+    "BS Test Report Oct-26.pdf"
+  ]
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Level: quote comparison</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="mark">=</span>Level</div>
+  <nav id="nav"></nav>
+  <div class="top-right">
+    <span id="rfxid" class="muted"></span>
+    <span id="model" class="pill" title="Model behind every AI step. Switch with LLM_PROVIDER in .env"></span>
+    <button class="ghost" id="reset" title="Clear everything and start again">Reset</button>
+  </div>
+</header>
+<main id="view"></main>
+<aside id="drawer" class="drawer" hidden></aside>
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

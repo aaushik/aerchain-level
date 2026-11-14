@@ -1,0 +1,13 @@
+{
+  "vendor_id": "V2",
+  "from_name": "Pacific Kraft Packaging (India) Pvt Ltd",
+  "from": "quotes@pacifickraft.example",
+  "to": "meera.iyer@saffronbasket.example",
+  "subject": "Pacific Kraft quotation Q-26-4471 against RFQ-2026-118",
+  "date": "2026-11-07T11:05:00+05:30",
+  "body": "Dear Meera,\n\nAttached is our quotation for the FY27-28 corrugated requirement together with our ISO certificate. Questionnaire responses are in Annexure A of the quotation.\n\nHappy to walk you through it on a call.\n\nBest regards,\nAnita Deshmukh\nKey Account Manager, Pacific Kraft Packaging (India)",
+  "attachments": [
+    "PKP_Quotation_Q-26-4471.pdf",
+    "ISO9001_Certificate_PKP.pdf"
+  ]
+}
