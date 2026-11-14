@@ -1,7 +1,7 @@
 [project]
 name = "aerchain-level"
 version = "0.1.0"
-description = "Add your description here"
+description = "RFx co-pilot, any-format quote extraction and levelled bid comparison"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=2.8.0",
