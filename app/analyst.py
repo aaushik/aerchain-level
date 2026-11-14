@@ -152,8 +152,8 @@ TOOLS = [
          "title": {"type": "string"},
          "eligible_vendor_ids": {"type": "array", "items": {"type": "string"}, "description": "Vendor ids allowed to win lines. Omit for all."},
          "max_vendors": {"type": "integer", "description": "Maximum number of vendors in the award. 1 = single-source."},
-         "allowed_statuses": {"type": "array", "items": {"type": "string", "enum": ["verified", "assumed", "needs_review"]},
-                              "description": "Which price statuses may win a line. Default is verified and assumed: needs_review prices are held back and listed. Include needs_review only if the buyer asks."}}, "required": ["title"]}},
+         "allowed_statuses": {"type": "array", "items": {"type": "string", "enum": ["verified", "assumed"]},
+                              "description": "Which price statuses may win a line. Default is both. needs_review prices can never win: they are held back and listed until the buyer resolves them on the Compare screen."}}, "required": ["title"]}},
     {"name": "chart", "description": "Show the buyer a chart built from a SQL result. First column of the result is the category axis; "
      "each further numeric column is a series.",
      "schema": {"type": "object", "properties": {"sql": {"type": "string"}, "title": {"type": "string"},
@@ -181,7 +181,8 @@ Honesty about the data, which is the point of this product:
 - vendors.open_issues lists vendor-level comparability problems (for example freight not included). Check it before recommending a vendor.
 - If the question cannot be answered from the data, say what is missing.
 
-- Prices with status needs_review are held back from award scenarios by default. If held-back prices would have won lines, say how many and for which vendor, in one sentence.
+- To say what a constraint (quality gate, vendor limit, exclusion) costs, run the constrained scenario and quote its cost_of_constraints_inr and if_one_excluded_vendor_were_added. Never infer the cost by comparing two totals yourself.
+- Prices with status needs_review are always held back from award scenarios until the buyer resolves them. If held-back prices would have won lines, say how many and for which vendor, in one sentence.
 - Counts matter too: if you say "N lines" or "N vendors", N must come from a query result (use COUNT), never from your own counting.
 - Each turn stands alone: re-query any number you repeat from earlier in the conversation, because the buyer may have changed the data since.
 
@@ -259,7 +260,8 @@ def ask(question):
                 blocks.append({"type": "table", "title": a.get("title"), "columns": cols, "rows": rows[:200], "sql": sql})
             return {"columns": cols, "rows": rows, "row_count": len(rows)}
         if name == "award_scenario":
-            res = award_scenario(comp, a.get("eligible_vendor_ids"), a.get("max_vendors"), a.get("allowed_statuses"))
+            statuses = [x for x in (a.get("allowed_statuses") or []) if x != "needs_review"] or None   # enforced, not just prompted
+            res = award_scenario(comp, a.get("eligible_vendor_ids"), a.get("max_vendors"), statuses)
             if "error" in res:
                 return res
             state["scenario"] = res

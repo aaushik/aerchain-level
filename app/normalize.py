@@ -8,6 +8,7 @@ Everything here is deterministic arithmetic with a paper trail. Every cell carri
 A status is never a model's opinion of itself. It is derived from named, checkable reasons.
 """
 import json
+import re
 import statistics
 from datetime import date
 
@@ -67,7 +68,8 @@ def normalize_item(it, line, rfx, settings, vs, terms):
     if per != 1:
         steps.append(f"{cur} {amount:,.2f} per {per:g} {uom} → {cur} {price:,.4f} per {uom}.")
     else:
-        steps.append(f"Vendor quoted {cur} {amount:,.4f} per {it.get('uom_text') or uom}.")
+        unit_txt = re.sub(r"^\s*per\s+", "", it.get('uom_text') or uom, flags=re.I)   # vendors often write "per box"
+        steps.append(f"Vendor quoted {cur} {amount:,.4f} per {unit_txt}.")
 
     # 2. unit of measure
     if uom != line["uom"]:

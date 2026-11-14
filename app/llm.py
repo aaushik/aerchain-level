@@ -14,14 +14,16 @@ import os
 import re
 import time
 from pathlib import Path
+import logging
 
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+log = logging.getLogger("uvicorn.error")
 
 PROVIDER = os.environ.get("LLM_PROVIDER", "gemini").lower()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
-GEMINI_FALLBACK = [m.strip() for m in os.environ.get("GEMINI_FALLBACK", "gemini-3-flash-preview,gemini-2.5-flash,gemini-3.1-flash-lite").split(",") if m.strip()]
+GEMINI_FALLBACK = [m.strip() for m in os.environ.get("GEMINI_FALLBACK", "gemini-2.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite").split(",") if m.strip()]
 LAST = {"model": None}      # which model actually answered the most recent call
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 
@@ -51,9 +53,14 @@ def parse_json(text):
 
 
 # ------------------------------------------------------------------ Gemini
+GEMINI_TIMEOUT_S = int(os.environ.get("GEMINI_TIMEOUT_S", "90"))   # a stalled model hands over to the next one
+
+
 def _gemini():
     from google import genai
-    return genai.Client(api_key=os.environ.get("GEMINI_API_KEY") or os.environ["GOOGLE_API_KEY"])
+    from google.genai import types
+    return genai.Client(api_key=os.environ.get("GEMINI_API_KEY") or os.environ["GOOGLE_API_KEY"],
+                        http_options=types.HttpOptions(api_version="v1beta", timeout=GEMINI_TIMEOUT_S * 1000))
 
 
 _COOLDOWN = {}          # model -> time until which we skip it (it just told us it is overloaded or out of quota)
@@ -67,18 +74,31 @@ def _gemini_call(client, **kw):
     last = None
     for round_ in range(2):
         for model in chain:
-            if _COOLDOWN.get(model, 0) > time.time() and round_ == 0:
+            until = _COOLDOWN.get(model, 0)
+            if until == float("inf") or (until > time.time() and round_ == 0):
                 continue
+            t0 = time.time()
             try:
                 resp = client.models.generate_content(model=model, **kw)
                 LAST["model"] = model
+                log.info("gemini %s ok in %.1fs", model, time.time() - t0)
                 return resp
             except errors.APIError as e:
                 last = e
                 code = getattr(e, "code", None)
-                if code not in (429, 500, 503):
+                log.warning("gemini %s failed %s in %.1fs", model, code, time.time() - t0)
+                if code == 404:                              # model retired or not on this key: never try it again
+                    _COOLDOWN[model] = float("inf")
+                    continue
+                if code not in (429, 500, 502, 503, 504):
                     raise
                 _COOLDOWN[model] = time.time() + (600 if code == 429 else 180)
+            except Exception as e:                           # timeouts and dropped connections
+                if "timeout" not in type(e).__name__.lower() and "timed out" not in str(e).lower():
+                    raise
+                last = e
+                log.warning("gemini %s timed out after %.1fs", model, time.time() - t0)
+                _COOLDOWN[model] = time.time() + 180
         time.sleep(5)
     raise last or RuntimeError("No Gemini model available")
 
