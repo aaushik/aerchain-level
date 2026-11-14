@@ -200,7 +200,8 @@ def clarify(vendor_id: str):
         raise HTTPException(404, "Unknown vendor")
     lines = {l["id"]: l for l in comp["rfx"]["lines"]}
     pts = [a["question_for_vendor"] for a in v["ambiguities"] if a.get("question_for_vendor")]
-    pts += [f["text"] for f in v["flags"] if f["code"] in ("FREIGHT", "FREIGHT_UNCLEAR")]
+    if any(f["code"] in ("FREIGHT", "FREIGHT_UNCLEAR") for f in v["flags"]):
+        pts.append("Please state freight to our Bhiwandi FC as an amount or a percentage, or requote on a delivered basis, so your prices can be compared with the others.")
     by_code = {}
     for c in comp["cells"]:
         if c["vendor_id"] == vendor_id and not (c.get("decision") or {}).get("action"):
