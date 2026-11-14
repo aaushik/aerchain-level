@@ -90,9 +90,9 @@ def _gemini_call(client, **kw):
                 if code == 404:                              # model retired or not on this key: never try it again
                     _COOLDOWN[model] = float("inf")
                     continue
-                if code not in (429, 500, 502, 503, 504):
+                if code not in (402, 429, 500, 502, 503, 504):
                     raise
-                _COOLDOWN[model] = time.time() + (600 if code == 429 else 180)
+                _COOLDOWN[model] = time.time() + (600 if code in (402, 429) else 180)
             except Exception as e:                           # timeouts and dropped connections
                 if "timeout" not in type(e).__name__.lower() and "timed out" not in str(e).lower():
                     raise
