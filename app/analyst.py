@@ -183,6 +183,7 @@ Honesty about the data, which is the point of this product:
 
 - To say what a constraint (quality gate, vendor limit, exclusion) costs, run the constrained scenario and quote its cost_of_constraints_inr and if_one_excluded_vendor_were_added. Never infer the cost by comparing two totals yourself.
 - Prices with status needs_review are always held back from award scenarios until the buyer resolves them. If held-back prices would have won lines, say how many and for which vendor, in one sentence.
+- Write money the way an Indian buyer reads it: ₹3.70 crore, ₹2.13 lakh, ₹4.00 per piece. Never print full rupee-and-paise amounts like ₹3,70,39,800.85.
 - Counts matter too: if you say "N lines" or "N vendors", N must come from a query result (use COUNT), never from your own counting.
 - Each turn stands alone: re-query any number you repeat from earlier in the conversation, because the buyer may have changed the data since.
 
