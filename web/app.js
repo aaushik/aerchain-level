@@ -1,4 +1,4 @@
-/* Level front end. No build step, no dependencies: one file the reviewer can read top to bottom. */
+/* RFx assistant front end. No build step, no dependencies: one file the reviewer can read top to bottom. */
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const nf = (d) => new Intl.NumberFormat("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });

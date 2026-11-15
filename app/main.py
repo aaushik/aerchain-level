@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from . import analyst, copilot, db, extract, llm, normalize
 
-app = FastAPI(title="Level")
+app = FastAPI(title="RFx assistant")
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 
@@ -442,7 +442,7 @@ def export_comparison():
                 cell.fill = fills[c.get("cell_status", c["status"])]
             notes = c["steps"] + [f"[{f['severity']}] {f['text']}" for f in c["flags"]]
             if notes:
-                cell.comment = Comment("\n".join(notes)[:1500], "Level")
+                cell.comment = Comment("\n".join(notes)[:1500], "RFx assistant")
     ws.append([]); ws.append(["Legend: white = Clear. Yellow = Check assumption (rests on an assumption about that price). Red = Likely wrong "
                               "(probably wrong or not like-for-like). Grey = Not quoted. Assumptions that apply to a vendor's whole column are in row 2, "
                               "not coloured per cell. Hover a cell for how the number was derived; the Flags sheet lists every assumption, vendor-wide ones included."])

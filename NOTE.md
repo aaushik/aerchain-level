@@ -1,4 +1,4 @@
-# Level: what I decided, and what I left out
+# RFx assistant: what I decided, and what I left out
 
 **The bet.** A buyer's week on a quote round is not lost retyping prices. It is lost in the back-and-forth to resolve doubt: per kg or per box, which lines a group rate covers, whether freight is in. So the product turns every doubt into a specific question to the right vendor, tracks the reply, and re-levels the comparison when it arrives.
 
