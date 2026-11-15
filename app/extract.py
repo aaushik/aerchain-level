@@ -100,6 +100,7 @@ Rules:
 12. Questionnaire: answer only from what the vendor wrote or attached. If a question is not addressed, omit it. Do not guess.
 13. For each attachment that is a supporting document (certificate, test report), summarise it and capture any validity or expiry date.
 14. List in ambiguities anything a careful buyer would want to ask the vendor before trusting the numbers.
+15. The response may be a thread: the vendor's first reply, then the buyer's clarification email, then the vendor's answer to it. Read the whole thread as one response. Where a later message restates a price, changes a price basis, says which lines a rate covers, states freight, or answers a questionnaire item, the later message wins and is the evidence (source_file is its label, for example "reply 1"). Prices from the first reply that later messages do not touch still stand. Never take a price or an answer from the buyer's own clarification email. Drop ambiguities that a later message has resolved.
 
 Return ONE JSON object, no prose, with exactly this shape:
 {
@@ -111,7 +112,7 @@ Return ONE JSON object, no prose, with exactly this shape:
             "evidence": str, "location": str, "source_file": str,
             "read_confidence": "high"|"medium"|"low", "match_confidence": "high"|"medium"|"low", "note": str|null}],
  "not_quoted": [{"line_id": str, "reason": str|null, "evidence": str|null}],
- "terms": {"freight": {"status": "included"|"extra"|"unclear", "detail": str|null, "evidence": str|null},
+ "terms": {"freight": {"status": "included"|"extra"|"unclear", "pct": number|null, "detail": str|null, "evidence": str|null},
            "taxes": str|null, "payment_terms": str|null, "validity": str|null, "lead_time_days": number|null,
            "discounts": [{"pct": number, "condition": str|null, "applies_to": str, "evidence": str}],
            "one_time_charges": [{"description": str, "amount": number, "currency": str, "evidence": str}],
@@ -122,7 +123,8 @@ Return ONE JSON object, no prose, with exactly this shape:
                 "valid_until": "YYYY-MM-DD"|null, "key_facts": [str]}],
  "ambiguities": [{"about": str, "detail": str, "question_for_vendor": str}]
 }
-"uom": use "piece" for box/nos/each/pc/EA/sheet/pad, "set" for sets, "kg" for weight. source_file is the attachment name, or "email body"."""
+"uom": use "piece" for box/nos/each/pc/EA/sheet/pad, "set" for sets, "kg" for weight. source_file is the attachment name, "email body", or the label of a later reply.
+freight.pct: only when freight is extra and the vendor states it as a percentage of the price; copy the number as written."""
 
 
 def rfx_brief(rfx):
@@ -156,6 +158,25 @@ def evidence_found(evidence, source: dict, source_file=None):
     return bool(nums) and all(n.replace(",", "") in hay for n in nums)
 
 
+def thread_parts(vendor_id):
+    """The clarification emails the buyer sent and the vendor's replies, in order. Empty until a reply is recorded."""
+    replies = db.rows("SELECT * FROM replies WHERE vendor_id=? ORDER BY ts", (vendor_id,))
+    if not replies:
+        return [], {}
+    asks = db.rows("SELECT body, ts FROM outbox WHERE vendor_id=? AND kind='clarification' ORDER BY ts", (vendor_id,))
+    msgs = sorted([("ask", a["ts"], a["body"]) for a in asks] + [("reply", r["ts"], r["body"]) for r in replies], key=lambda m: m[1])
+    parts, source, n = [], {}, 0
+    for kind, ts, body in msgs:
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(ts))
+        if kind == "ask":
+            parts.append(llm.text_part(f"--- LATER: BUYER'S CLARIFICATION EMAIL to the vendor, {when} (the buyer's words, not prices) ---\n{body}"))
+        else:
+            n += 1
+            parts.append(llm.text_part(f"--- LATER: VENDOR'S REPLY, label \"reply {n}\", {when}. Where it restates or settles something, it wins. ---\n{body}"))
+            source[f"reply {n}"] = body
+    return parts, source
+
+
 def extract_vendor(vendor_id, rfx, force=False):
     row = db.rows("SELECT * FROM responses WHERE vendor_id=?", (vendor_id,))
     if not row:
@@ -166,14 +187,18 @@ def extract_vendor(vendor_id, rfx, force=False):
     folder = Path(row["dir"])
     try:
         email, parts, source, files = load_response(folder)
+        tparts, tsource = thread_parts(vendor_id)
+        parts += tparts; source.update(tsource)
         vendor = next((v for v in rfx["vendors"] if v["id"] == vendor_id), {"name": email["from_name"]})
         prompt = [llm.text_part(rfx_brief(rfx) + f"\n\nThe response below is from vendor {vendor_id} ({vendor['name']}).\n"
                                 "--- VENDOR RESPONSE STARTS ---")] + parts
+        llm.begin_turn()
         data = llm.read_json(SYSTEM, prompt)
         data = clean(data, rfx, source, files)
         db.run("UPDATE responses SET status='extracted', extraction=?, source_text=?, model=?, error=NULL, extracted_at=? WHERE vendor_id=?",
                (json.dumps(data, ensure_ascii=False), json.dumps(source, ensure_ascii=False), llm.model_name(), time.time(), vendor_id))
-        db.audit("extracted", f"{vendor_id} via {llm.model_name()}: {len(data['items'])} priced items")
+        db.audit("extracted", f"{vendor_id} via {llm.model_name()}" + (f" (fallback; configured {llm.primary()})" if llm.model_name() != llm.primary() else "")
+                 + f": {len(data['items'])} priced items" + (f", thread of {len(tsource)} repl{'y' if len(tsource) == 1 else 'ies'}" if tsource else ""))
         return data
     except Exception as e:
         db.run("UPDATE responses SET status='error', error=? WHERE vendor_id=?", (f"{type(e).__name__}: {e}", vendor_id))
@@ -222,6 +247,8 @@ def clean(data, rfx, source, files):
     data["not_quoted"] = [n for n in (data.get("not_quoted") or []) if isinstance(n, dict) and n.get("line_id") in ids]
     t = data.get("terms") or {}
     t.setdefault("freight", {"status": "unclear", "detail": None, "evidence": None})
+    if isinstance(t["freight"], dict):
+        t["freight"]["pct"] = _num(t["freight"].get("pct"))
     t["discounts"] = [d for d in (t.get("discounts") or []) if _num(d.get("pct"))]
     for d in t["discounts"]:
         d["pct"] = _num(d["pct"])

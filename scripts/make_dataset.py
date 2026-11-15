@@ -4,6 +4,7 @@ Writes:
   data/seed/rfx.json            canonical RFx, questionnaire, vendors, last-year prices, FX
   data/seed/truth.json          ground-truth per-piece INR prices (used only by scripts/eval.py)
   data/vendor_replies/<id>/     email.json + attachments, exactly as a buyer would receive them
+  data/vendor_replies/V5/clarification_reply.json   Om Sai's answer to the clarification email (recorded by the buyer in the demo)
 
 Nothing here is read by the extraction or analysis code except rfx.json and the raw reply files.
 """
@@ -544,6 +545,50 @@ def make_v5():
     (REPLIES / "V5").mkdir(parents=True, exist_ok=True)
     email("V5", "Re: RFQ-2026-118", "2026-11-10T21:14:00+05:30",
           "Meera ji,\n\n₹42/kg for the 5-ply, 38 for the 3-ply, rest same as last year, freight extra.\n\nSuresh\nOm Sai Packaging", [])
+    make_v5_reply()
+
+
+# V5's answer to the buyer's clarification email. Not part of the first inbox: the buyer records it on the Compare
+# screen ("Record vendor reply"), and the thread is re-read. Consistent with TRUE["V5"]: kg rates are for RSC boxes
+# only, everything else restated at last year's contract price; freight is stated so the hold-back lifts.
+V5_REPLY = """Meera ji,
+
+Thanks for your mail. Sorry my last reply was short, I was travelling. Point wise:
+
+1. Rs 42/kg is for all 5 ply RSC boxes and Rs 38/kg for all 3 ply RSC boxes, including the big 800x600x500 box and the 320x240x120 box. Weight we will take as per your size and GSM, invoice will be per piece on that weight.
+
+2. Mailer boxes, partitions and pads are NOT on kg rate. Same as our last year contract RC-2025-071, no increase:
+Mailer 200x150x50 - Rs 4.05 per pc
+Mailer 250x200x60 - Rs 6.26 per pc
+Mailer 300x220x80 - Rs 9.05 per pc
+Mailer 350x250x100 - Rs 12.70 per pc
+6 cell partition set - Rs 4.28 per set
+12 cell partition set - Rs 10.66 per set
+3 ply layer pad 400x300 - Rs 1.75 per pc
+5 ply layer pad 600x400 - Rs 7.28 per pc
+
+3. Rolls also same as last year: 1200 mm roll Rs 37.08 per kg, 900 mm roll Rs 38.07 per kg.
+
+4. Freight up to your Bhiwandi FC will be 2.5% on basic amount, shown separately in invoice. GST extra as applicable.
+
+5. Your questions:
+- ISO 9001: yes, our certificate is valid till 27-09-2027. Copy I will send separately.
+- In-house lab: yes, bursting strength, ECT and Cobb testing all in our own lab at Bhiwandi.
+- Rejection last year: 1.4%
+- Capacity: 350 MT per month
+- 60 days from GRN is ok for us.
+
+We are supplying you since 2019, please consider us.
+
+Regards,
+Suresh
+Om Sai Packaging"""
+
+
+def make_v5_reply():
+    (REPLIES / "V5" / "clarification_reply.json").write_text(json.dumps({
+        "vendor_id": "V5", "from_name": "Om Sai Packaging", "date": "2026-11-12T19:40:00+05:30",
+        "subject": "Re: RFQ-2026-118: clarifications needed", "body": V5_REPLY}, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -1,38 +1,38 @@
 # Level: what I decided, and what I left out
 
-**The bet.** Extraction is not the hard part any more; a current model reads an angled photo of a rate card correctly. The hard part is that a buyer cannot tell which of 150 numbers to distrust. So the product is built around one question: *for every number on screen, can the buyer see where it came from and why it might be wrong?*
+**The bet.** A buyer's week on a quote round is not lost retyping prices. It is lost in the back-and-forth to resolve doubt: per kg or per box, which lines a group rate covers, whether freight is in. So the product turns every doubt into a specific question to the right vendor, tracks the reply, and re-levels the comparison when it arrives.
+
+The brief frames the problem as reading messy responses. Having built it, I think the larger problem is resolving doubt with vendors after quotes arrive, and preventing that ambiguity in the RFx before it goes out.
+
+**The user** is a category buyer running an annual rate contract for corrugated packaging: about ₹4 crore a year, 30 lines, five vendors.
+
+**The week deleted** means no rekeying five formats, no hunting for the wrong number among 150, no chasing questions by hand. The buyer sends one generated question list per vendor, pastes the answer, and the grid re-levels.
+
+**At award the buyer hands the VP** the scenario (winners by line, split by vendor, total, saving against last year, cost of the constraints), the assumptions it rests on, and what was held back from winning and why. One Excel export carries all three.
 
 ## Decisions
 
-**1. The model reads. Code computes.** The model's only job in extraction is to copy what the vendor wrote: amount, currency, "per how many of what", which RFx line, and a verbatim snippet as evidence. It is told never to convert anything. Unit conversion, FX, discounts, totals and questionnaire pass/fail are deterministic code. The same rule holds in the analyst: the model writes SQL or calls an exact award engine, and never does arithmetic. A wrong sum on a ₹4 crore award is not a recoverable error.
+**1. The model reads. Code computes.** The model copies what the vendor wrote, with verbatim evidence. Conversion, FX, discounts, freight, totals and questionnaire scoring are deterministic code. The analyst writes SQL or calls an exact award engine.
 
-**2. No confidence percentages.** A model's "92% confident" means nothing a buyer can act on. Each cell instead has a status derived from named, checkable reasons:
-- *Verified*: unit and currency match the RFx, the cited text was found in the source, price is in line with other vendors.
-- *Assumed*: usable, but rests on something stated (an FX rate, a calculated box weight for a per-kg quote, last year's price for "same as last year", a photo that cannot be text-searched).
-- *Needs review*: probably wrong or not like-for-like (vendor's own line total contradicts the rate, price is a 2x outlier, spec substitution, unclear whether a group rate covers the line).
+**2. No confidence percentages.** Each cell has a status built from named reasons: *verified*, *assumed* (rests on a stated FX rate, calculated weight or last year's price), or *needs review*. An assumption shared by every price from a vendor, like Pacific Kraft's USD rate, is one issue on that vendor; colour is kept for cells that need a look. The status still counts it.
 
-**3. Uncertainty changes behaviour, not just colour.** Needs-review prices cannot win a line in an award scenario until the buyer resolves them; the scenario lists what was held back. Conditional discounts are shown but not applied by default. "Freight extra" with no amount blocks nothing but is stated on every answer that uses those prices. A questionnaire that was not answered is "incomplete", never "cleared".
+**3. Uncertainty changes behaviour, not just colour.** Needs-review prices cannot win a line in an award scenario; the scenario lists what was held back. A vendor with freight extra and no amount is quoting ex-works against delivered prices, so all its prices are held back until a freight percentage is set or stated. Conditional discounts are not applied by default. An unanswered question, or an ISO certificate claimed but not attached, leaves quality "incomplete", never "cleared".
 
-**4. Free checks before clever ones.** The best catch in the dataset (a per-piece rate typed into a per-100 column, making a ₹4.00 mailer look like ₹0.04) is caught twice without a model: the vendor's own line total disagrees, and the price is 99% below the median. The fix is offered as one click.
+**4. Free checks before clever ones.** A per-piece rate typed into a per-100 column (₹4.00 showing as ₹0.04) is caught without a model: the vendor's own line total disagrees.
 
-**5. Answers show their working, and are checked.** Each analyst answer lists the queries behind it. Every rupee figure, percentage and line count in the prose is matched against the query results; anything unmatched is called out under the answer. In testing this caught a weaker model reusing numbers from an earlier turn.
+**5. Answers show their working, and are checked.** Each analyst answer lists its queries, and every figure in the prose is matched against the results. Numbers can match and still belong to the wrong vendor: in testing the model filtered on Pacific Kraft's id, labelled it Shree Balaji, and every figure traced. SQL now sees vendor names only. A second check flags a query that filters on one vendor but labels it (comment, column or table alias) as another, and a vendor named next to prices that no price-returning query of that turn filtered on or returned. It is pattern matching. A fallback model answering is called out.
 
-**6. Close the loop with the vendor.** One click drafts the clarification email from the open flags. The honest output of an uncertain extraction is a question, not a guess.
+**6. Close the loop.** One click drafts the clarification email from the open flags. The buyer pastes the reply, the model re-reads the whole thread, the comparison re-levels and changed cells are marked. In the demo, Om Sai's reply turns ten red cells into usable prices and states freight, so its prices stop being held back. Its quality stays incomplete: it claims ISO 9001 but sends no certificate, and the next clarification asks for one. The product does not clear a vendor on a claim.
 
-**7. Category: corrugated packaging**, because it has the nastiest real unit problem: converters think in ₹/kg, buyers in ₹/box, and the bridge is box weight, which nobody states. The RFx co-pilot therefore captures dimensions and board spec so a weight can be calculated and shown as an assumption.
+**7. Category: corrugated packaging**, for the nastiest unit problem: converters quote ₹/kg, buyers buy per box, and the bridge is a box weight nobody states. The co-pilot captures dimensions so the weight is calculated and shown as an assumption.
 
 ## Measured, with caveats
 
-One live run over the five fabricated responses (145 prices): 138 right, 7 wrong, **all 7 flagged for review, 0 silently wrong, 0 invented**. This is one run on data I fabricated myself, so it shows the checks work on the traps I built in, not field accuracy. `scripts/eval.py` reproduces it.
+One live run over the five responses (145 prices): 138 right, 7 wrong, all 7 flagged, 0 silently wrong, 0 invented. After Om Sai's reply was re-read, 144 prices right; the one left is the flagged ₹0.04. This is one run on data I fabricated, with a synthetic photo: it shows the checks catch my own traps, not field accuracy. `scripts/eval.py` reproduces it.
 
 ## Left out on purpose
 
-- **Real email.** Stubbed, as the brief allows. Inbound parsing is plumbing.
-- **Bounding boxes on the photo.** The drawer shows the whole image beside the reading. Per-cell crops would be better and are the first thing I would add.
-- **Landed-cost modelling.** Freight is a buyer-entered percentage; GST, payment-term cost of money and one-time tooling charges are surfaced as flags, not priced in.
-- **Multi-round negotiation, approvals, users and roles, more than one RFx.**
-- **Model fine-tuning or OCR pipelines.** A general multimodal model plus verification was enough at this size.
-
-## Where I think the better problem is
-
-The brief frames this as reading messy responses. Having built it, I think the bigger win is upstream and downstream of reading. Upstream: most of the ambiguity (per kg vs per box, freight basis, which lines a rate covers) exists because the RFx let it exist, so the co-pilot should make the comparison basis explicit before anything is sent. Downstream: the days are lost not in retyping but in the back-and-forth to resolve doubt. A system that turns every flag into a specific question to the right vendor, tracks the reply, and re-levels automatically deletes more of the week than a better parser does.
+- **Real email.** Stubbed; replies are pasted in.
+- **Changing a sent RFx.** It is locked once sent; a change means a new draft. Addenda would be the proper fix.
+- **Landed cost, negotiation, approvals, roles, multiple RFx.**
+- **Prevention upstream.** Most ambiguity exists because the RFx allowed it. The co-pilot pushes for an explicit price basis but does not refuse to send without one.

@@ -12,6 +12,7 @@ import base64
 import json
 import os
 import re
+import threading
 import time
 from pathlib import Path
 import logging
@@ -24,12 +25,36 @@ log = logging.getLogger("uvicorn.error")
 PROVIDER = os.environ.get("LLM_PROVIDER", "gemini").lower()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
 GEMINI_FALLBACK = [m.strip() for m in os.environ.get("GEMINI_FALLBACK", "gemini-2.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite").split(",") if m.strip()]
-LAST = {"model": None}      # which model actually answered the most recent call
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+_T = threading.local()      # which model actually answered, per request thread (extractions run in parallel)
+
+
+def primary():
+    """The configured model. Anything else that answers is a fallback, and the UI says so."""
+    return f"{PROVIDER}:{CLAUDE_MODEL if PROVIDER == 'claude' else GEMINI_MODEL}"
+
+
+def _answered(model):
+    if PROVIDER == "claude" and model.startswith(CLAUDE_MODEL + "-"):    # dated snapshot of the configured alias
+        model = CLAUDE_MODEL
+    name = f"{PROVIDER}:{model}"
+    _T.last = name
+    if name not in getattr(_T, "used", []):
+        _T.used = getattr(_T, "used", []) + [name]
+
+
+def begin_turn():
+    _T.used, _T.last = [], None
+
+
+def used_models():
+    """Every model that answered since begin_turn() in this thread, in order."""
+    return list(getattr(_T, "used", []))
 
 
 def model_name():
-    return f"{PROVIDER}:{CLAUDE_MODEL if PROVIDER == 'claude' else (LAST['model'] or GEMINI_MODEL)}"
+    """The model that answered the most recent call in this thread, else the configured one."""
+    return getattr(_T, "last", None) or primary()
 
 
 def text_part(text):
@@ -80,7 +105,7 @@ def _gemini_call(client, **kw):
             t0 = time.time()
             try:
                 resp = client.models.generate_content(model=model, **kw)
-                LAST["model"] = model
+                _answered(model)
                 log.info("gemini %s ok in %.1fs", model, time.time() - t0)
                 return resp
             except errors.APIError as e:
@@ -181,6 +206,7 @@ def _claude_json(system, parts, max_tokens):
     with _claude().beta.messages.stream(model=CLAUDE_MODEL, max_tokens=max_tokens, system=system,
                                         messages=[{"role": "user", "content": _claude_parts(parts)}], **_CLAUDE_KW) as s:
         msg = s.get_final_message()
+    _answered(getattr(msg, "model", None) or CLAUDE_MODEL)
     if msg.stop_reason == "refusal":
         raise RuntimeError("The model declined this request.")
     return parse_json("".join(b.text for b in msg.content if b.type == "text"))
@@ -193,6 +219,7 @@ def _claude_tools(system, history, tools, execute, max_steps):
     for _ in range(max_steps):
         resp = client.beta.messages.create(model=CLAUDE_MODEL, max_tokens=16000, system=system, tools=tdefs,
                                            messages=messages, **_CLAUDE_KW)
+        _answered(getattr(resp, "model", None) or CLAUDE_MODEL)
         if resp.stop_reason == "refusal":
             return "The model declined this request."
         if resp.stop_reason != "tool_use":

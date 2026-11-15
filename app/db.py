@@ -1,16 +1,18 @@
 """Storage: one SQLite file. JSON blobs where the shape is still moving, rows where we audit."""
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
-DB_PATH = DATA / "level.db"
+WORK = Path(os.environ.get("LEVEL_WORK_DIR") or DATA)       # state (db, uploads, exports); point at a copy to test without touching a live session
+DB_PATH = WORK / "level.db"
 SEED = DATA / "seed"
 REPLIES = DATA / "vendor_replies"
-UPLOADS = DATA / "uploads"
-EXPORTS = DATA / "exports"
+UPLOADS = WORK / "uploads"
+EXPORTS = WORK / "exports"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -20,16 +22,19 @@ CREATE TABLE IF NOT EXISTS responses (
 CREATE TABLE IF NOT EXISTS overrides (
   vendor_id TEXT, line_id TEXT, action TEXT, price REAL, note TEXT, ts REAL, PRIMARY KEY (vendor_id, line_id));
 CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, vendor_id TEXT, kind TEXT, subject TEXT, body TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS replies (id INTEGER PRIMARY KEY AUTOINCREMENT, vendor_id TEXT, body TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, event TEXT, detail TEXT);
 """
 
 
 def conn():
-    for d in (DATA, UPLOADS, EXPORTS):
+    for d in (WORK, UPLOADS, EXPORTS):
         d.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
     c.executescript(SCHEMA)
+    if "grp" not in {r[1] for r in c.execute("PRAGMA table_info(overrides)")}:
+        c.execute("ALTER TABLE overrides ADD COLUMN grp TEXT")            # decisions made for a group of cells share an id, so one undo reverts them
     return c
 
 
@@ -60,6 +65,13 @@ def run(sql, args=()):
         c.execute(sql, args)
 
 
+def many(statements):
+    """[(sql, args), ...] in one transaction: all of them or none."""
+    with conn() as c:
+        for sql, args in statements:
+            c.execute(sql, args)
+
+
 def seed_rfx():
     return json.loads((SEED / "rfx.json").read_text())
 
@@ -80,5 +92,5 @@ def settings():
 
 def reset():
     with conn() as c:
-        for t in ("kv", "responses", "overrides", "outbox", "audit"):
+        for t in ("kv", "responses", "overrides", "outbox", "replies", "audit"):
             c.execute(f"DELETE FROM {t}")

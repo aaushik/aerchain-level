@@ -90,12 +90,21 @@ def _finish_line(l):
     return l
 
 
+READ_ONLY = {"get_last_year_contract", "get_vendor_master"}
+LOCKED = """
+
+THIS RFx HAS BEEN SENT to vendors{when}{replies}. It is locked: you cannot change the title, scope, lines, questionnaire, terms or vendors, and you have no tools to do so. You can still answer questions about it. If the buyer asks for a change, say plainly that the RFx has already gone out and vendors have quoted against it, so changing it now would make their replies incomparable; to change it they should Reset and start a new draft (and re-send). Do not pretend to make the change."""
+
+
 def chat(message):
     rfx = db.get("rfx") or json.loads(json.dumps(EMPTY))
     seed = db.seed_rfx()
     changes = []
+    locked = rfx.get("status") == "sent"          # enforced here, not only in the prompt: no write tool runs and nothing is saved
 
     def execute(name, a):
+        if locked and name not in READ_ONLY:
+            return {"error": "The RFx has been sent and is locked. Nothing was changed."}
         if name == "get_last_year_contract":
             return {"contract_ref": seed["last_year"]["contract_ref"], "incumbent": "V5 Om Sai Packaging",
                     "lines": [{"category": l["category"], "description": l["description"], "board_spec": l["board_spec"], "uom": l["uom"],
@@ -165,8 +174,17 @@ def chat(message):
     history = db.get("copilot_chat", [])
     mh = [{"role": h["role"], "text": h["text"]} for h in history[-14:]]
     mh.append({"role": "user", "text": f"{message}\n\n[Current draft: {summary(rfx)}]"})
-    text = llm.run_tools(SYSTEM, mh, TOOLS, execute, max_steps=10)
-    db.put("rfx", rfx)
-    history += [{"role": "user", "text": message}, {"role": "assistant", "text": text, "changes": changes, "model": llm.model_name()}]
+    system, tools = SYSTEM, TOOLS
+    if locked:
+        n = len(db.rows("SELECT 1 FROM responses WHERE extraction IS NOT NULL"))
+        system += LOCKED.format(when=f" on {rfx['sent_at']}" if rfx.get("sent_at") else "", replies=f" and {n} responses have been read" if n else "")
+        tools = [t for t in TOOLS if t["name"] in READ_ONLY]
+    llm.begin_turn()
+    text = llm.run_tools(system, mh, tools, execute, max_steps=10)
+    if locked:
+        changes = []
+    else:
+        db.put("rfx", rfx)
+    history += [{"role": "user", "text": message}, {"role": "assistant", "text": text, "changes": changes, "model": llm.model_name(), "locked": locked}]
     db.put("copilot_chat", history)
     return {"text": text, "changes": changes, "rfx": rfx}

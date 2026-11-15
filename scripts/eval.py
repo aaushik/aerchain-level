@@ -33,7 +33,7 @@ def main():
         for lid in lines:
             c, t = cells[(v["id"], lid)], truth.get(v["id"], {}).get(lid)
             # ignore buyer decisions: we are scoring the machine, not the human
-            price = c["price"] if not c.get("decision") else None
+            price = c["list_price"] if c["price"] is not None else None      # truth is before discounts and freight, so compare like with like
             if c.get("decision"):
                 continue
             if t is None:
@@ -61,7 +61,7 @@ def main():
     print(f"\nPrices in truth: {quoted}.  Right: {tot['right']} ({100 * tot['right'] / max(quoted, 1):.1f}%).  "
           f"Wrong but flagged for review: {tot['wrong_flagged']}.  Wrong and silent: {tot['wrong_silent']}.  "
           f"Missed: {tot['missed']}.  Invented: {tot['invented']}.")
-    print("Note: truth applies each vendor's stated basis at the configured FX rate, before conditional discounts and freight estimates.")
+    print("Note: truth applies each vendor's stated basis at the configured FX rate, before discounts and freight (scored on list price).")
 
 
 if __name__ == "__main__":
