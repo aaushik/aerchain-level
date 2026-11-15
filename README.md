@@ -1,4 +1,4 @@
-# RFx assistant
+# RFx Assistant
 
 Take-home for Aerchain: "Kill the Quote Spreadsheet". A buyer drafts an RFx by talking, vendors reply in any format, every reply lands in one like-for-like comparison, and the buyer interrogates it in plain language through to an award.
 
